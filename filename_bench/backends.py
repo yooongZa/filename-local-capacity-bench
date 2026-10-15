@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import os
 import socket
 import subprocess
 import time
@@ -190,7 +191,8 @@ class LlamaBackend:
                    "-ub", str(self.cfg.get("engine_microbatch", 128))]
         self.log_file = Path(log_path).open("w", encoding="utf-8")
         start = time.perf_counter()
-        self.process = subprocess.Popen(command, stdout=self.log_file, stderr=subprocess.STDOUT)
+        self.process = subprocess.Popen(command, stdout=self.log_file, stderr=subprocess.STDOUT,
+                                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         self.pid = self.process.pid
         try:
             deadline = start + self.cfg.get("startup_timeout_s", 180)
