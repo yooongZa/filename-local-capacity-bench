@@ -138,6 +138,8 @@ def create_server(service, static, port=0):
                 elif self.path == "/api/cancel":
                     service.cancel()
                 elif self.path == "/api/quit":
+                    # 응답을 먼저 보내야 서버 종료와 응답 전송이 경합하지 않습니다.
+                    self.send({"ok": True})
                     service.cancel_event.set()
 
                     def stop():
@@ -146,6 +148,7 @@ def create_server(service, static, port=0):
                         self.server.shutdown()
 
                     threading.Thread(target=stop, daemon=True).start()
+                    return
                 elif self.path == "/api/config":
                     path = str(service.config_path)
                     if sys.platform == "win32":

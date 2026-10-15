@@ -69,7 +69,7 @@ async function poll(){
   const stage=state.busy?1:state.items.some(r=>r.status==='done')?3:state.items.length?2:0;
   document.querySelectorAll('nav span').forEach((s,i)=>s.classList.toggle('active',i===stage));
 
- }catch(error){showError(error.message);}finally{if(!quitting)setTimeout(poll,900);}
+ }catch(error){if(!quitting)showError(error.message);}finally{if(!quitting)setTimeout(poll,900);}
 }
 $('analyze').onclick=async()=>{try{
  showError('');edits.clear();selected.clear();previews.forEach(URL.revokeObjectURL);previews.clear();lastRows='';
@@ -78,7 +78,7 @@ $('analyze').onclick=async()=>{try{
 $('rename').onclick=async()=>{try{showError('');await api('/api/rename',{items:[...selected].map(id=>({id,tags:edits.get(id)}))});}catch(error){showError(error.message);}};
 $('undo').onclick=async()=>{if(!confirm('이 폴더에서 filename이 변경한 파일명을 원래 이름으로 되돌릴까요?'))return;try{showError('');await api('/api/undo',{});edits.clear();selected.clear();}catch(error){showError(error.message);}};
 $('cancel').onclick=()=>api('/api/cancel',{}).catch(e=>showError(e.message));
-$('quit').onclick=async()=>{if(state.busy&&!confirm('현재 작업 후 프로그램을 종료할까요?'))return;await api('/api/quit',{});quitting=true;$('message').textContent='프로그램을 종료합니다. 이 창을 닫아도 됩니다.';};
+$('quit').onclick=async()=>{if(state.busy&&!confirm('현재 작업 후 프로그램을 종료할까요?'))return;quitting=true;showError('');try{await api('/api/quit',{});$('message').textContent='프로그램을 종료합니다. 이 창을 닫아도 됩니다.';}catch(e){quitting=false;showError(e.message);poll();}};
 $('settings').onclick=()=>api('/api/config',{}).catch(e=>showError(e.message));
 $('selectAll').onchange=()=>{selected.clear();if($('selectAll').checked)state.items.filter(r=>['ready','review'].includes(r.status)).forEach(r=>selected.add(r.id));lastRows='';renderRows(state.items);};
 $('review').onchange=()=>{modeHint();refreshButton();};$('automatic').onchange=modeHint;
