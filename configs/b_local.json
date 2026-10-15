@@ -1,13 +1,9 @@
 {
-  "dataset_root": "../data/filename_eval24_1080",
+  "dataset_root": "../data/evaluation",
   "run_dir": "../runs/b",
   "prompt_path": "assets/prompt_v3.txt",
   "schema_path": "assets/schema_v3.json",
-  "case_ids": [
-    "I01",
-    "I03",
-    "V01"
-  ],
+  "case_ids": null,
   "seeds": [
     42
   ],
@@ -48,13 +44,15 @@
   "backend": {
     "kind": "llama-server",
     "server_path": "C:/llama/llama-server.exe",
-    "model_path": "C:/models/SET_YOUR_GEMMA4_E4B_QUANT.gguf",
-    "mmproj_path": "C:/models/SET_MATCHING_MMPROJ.gguf",
-    "quantization_label": "SET_ACTUAL_QUANTIZATION",
+    "model_path": "C:/models/gemma-4-12B-it-QAT-Q4_0.gguf",
+    "mmproj_path": "C:/models/mmproj-gemma-4-12B-it-QAT-BF16.gguf",
+    "quantization_label": "Q4_0 (QAT)",
     "gpu_layers": 999,
     "engine_token_batch": 512,
     "engine_microbatch": 128,
     "startup_timeout_s": 180,
-    "request_timeout_s": 180
+    "request_timeout_s": 180,
+    "model_label": "google/gemma-4-12b-qat",
+    "source_model_id": "lmstudio-community/gemma-4-12B-it-QAT-GGUF"
   }
 }
