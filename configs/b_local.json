@@ -54,5 +54,13 @@
     "request_timeout_s": 180,
     "model_label": "google/gemma-4-12b-qat",
     "source_model_id": "lmstudio-community/gemma-4-12B-it-QAT-GGUF"
-  }
+  },
+  "video_extraction": {
+    "seconds_per_frame": 10,
+    "max_frames": 5,
+    "ffmpeg_path": "ffmpeg",
+    "ffprobe_path": "ffprobe",
+    "timeout_s": 120
+  },
+  "profile_path": null
 }
