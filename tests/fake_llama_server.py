@@ -54,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             time.sleep(.05)
             items = body["messages"][0]["content"]
-            raw = json.dumps({"keywords": ["테스트"], "reason": "HTTP 테스트 응답", "place_name": None, "needs_review": False}, ensure_ascii=False)
+            raw = json.dumps({"keywords": ["테스트"], "reason": "HTTP 테스트 응답", "place_name": None}, ensure_ascii=False)
             self.send({"choices": [{"message": {"content": raw}, "finish_reason": "stop"}],
                        "usage": {"prompt_tokens": len(items[-1]["text"]) + 100, "completion_tokens": 30},
                        "test_message_count": len(body["messages"]),

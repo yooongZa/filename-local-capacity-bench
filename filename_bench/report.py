@@ -1,4 +1,4 @@
-"""Offline report generation. Exact word overlap is a diagnostic, not semantic accuracy."""
+"""로컬 실행 성능과 사람 평가표를 정리합니다. 용량 실험은 내용 자동 채점에서 제외합니다."""
 from __future__ import annotations
 
 import csv
@@ -10,8 +10,8 @@ from pathlib import Path
 
 from .common import read_json, read_rows, write_json
 
-HUMAN_FIELDS = ["reviewer", "tag_precision_0to1", "core_recall_0to1", "unsupported_claim_0or1",
-                "temporal_evidence_0to2", "needs_review_correct_0or1", "notes"]
+HUMAN_FIELDS = ["reviewer", "tag_accuracy_0to2", "filename_usefulness_0to2", "unsupported_claim_0or1",
+                "temporal_evidence_0to2", "notes"]
 
 
 def save_csv(path, rows, fields):
@@ -19,15 +19,6 @@ def save_csv(path, rows, fields):
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
-
-
-def lexical_diagnostic(predicted, answer):
-    norm = lambda words: {"".join(x.split()).casefold() for x in words}
-    p, a = norm(predicted), norm(answer)
-    tp = len(p & a)
-    precision = tp / len(p) if p else None
-    recall = tp / len(a) if a else None
-    return precision, recall
 
 
 def percentile(values, p):
@@ -68,14 +59,8 @@ def build_report(run_dir, dataset_root):
         parsed = row.get("parsed")
         # No model or reference claims for mock, capacity, failed, or malformed responses.
         quality = not mock and not row.get("capacity_only") and row["execution_status"] == "ok" and row["schema_valid"]
-        if quality and answer:
-            p, r = lexical_diagnostic(parsed["keywords"], answer["keywords"])
-            base.update(exact_tag_precision_diagnostic=p, exact_tag_recall_diagnostic=r,
-                        needs_review_reference_match=parsed["needs_review"] == answer["needs_review"],
-                        place_exact_reference_match=parsed["place_name"] == answer["place_name"])
-        else:
-            base.update(exact_tag_precision_diagnostic=None, exact_tag_recall_diagnostic=None,
-                        needs_review_reference_match=None, place_exact_reference_match=None)
+        base["place_exact_reference_match"] = (
+            parsed["place_name"] == answer["place_name"] if quality and answer else None)
         metrics.append(base)
         groups[(row["profile"], row.get("media_type", "unknown"))].append(row)
         note = notes.get(row["case_id"], {})
@@ -83,8 +68,8 @@ def build_report(run_dir, dataset_root):
                   "mock": mock, "capacity_only": row.get("capacity_only"),
                   "execution_status": row["execution_status"], "schema_valid": row["schema_valid"],
                   "selected_paths": json.dumps(row.get("media", {}).get("source_paths", []), ensure_ascii=False),
-                  "raw_output": row.get("raw_output"), "reference_answer": json.dumps(answer, ensure_ascii=False),
-                  "core_concepts": json.dumps(note.get("core_concepts", []), ensure_ascii=False),
+                  "raw_output": row.get("raw_output"), "reference_answer": json.dumps({key: answer[key] for key in ("keywords", "reason", "place_name")
+                                                  if key in answer} if answer else None, ensure_ascii=False),
                   "unsupported_claim_examples": json.dumps(note.get("unsupported_claims", []), ensure_ascii=False)}
         review.update({key: old_reviews.get(row["attempt_id"], {}).get(key, "") for key in HUMAN_FIELDS})
         reviews.append(review)
@@ -139,7 +124,7 @@ table{{border-collapse:collapse;font-size:13px}}td,th{{padding:10px;border:1px s
 pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#fff;padding:16px}}details{{margin:12px 0}}a{{color:#1253a4}}</style>
 <h1>{title}</h1><div class="notice">계획 측정 요청 {config['planned_requests']}개 · 저장된 시도 {len(rows)}개 · 고유 요청 {len({r['job_id'] for r in rows})}개 · 로드 이벤트 {len(events)}개.
 실패·재시도도 비율의 분모에 포함합니다. 계획 대비 누락과 아래 오류를 함께 확인하세요.</div>
-<p>참조 답안의 독립 사람 검수: {esc(config.get('reference_human_reviewed'))}. 문자열 일치 지표는 진단용이며 동의어·관찰 근거·행동 변화는 사람이 평가합니다.
+<p>참조 답안의 독립 사람 검수: {esc(config.get('reference_human_reviewed'))}. 최종 품질은 사람이 태그 정확성·파일명 활용도·관찰 근거·행동 변화를 보고 평가합니다.
 B의 용량 실험은 의미 품질 평가에서 제외합니다. 모의 실행 수치로 실제 속도·메모리를 판단하지 마세요.</p>
 <p><a href="summary.csv">조건별 요약</a> · <a href="metrics.csv">요청별 수치</a> · <a href="review.csv">사람 평가표</a> · <a href="requests.jsonl">응답 원문</a> · <a href="eda.json">데이터 점검</a></p>
 <h2>조건별 결과</h2>{table(summaries)}{chart}
@@ -147,8 +132,10 @@ B의 용량 실험은 의미 품질 평가에서 제외합니다. 모의 실행 
 GPU 메모리는 장치 전체의 표본 측정값이며 동시 요청에서 각 요청의 전용 메모리가 아닙니다. null은 측정 불가입니다.</p>
 <h2>시작·오류 기록</h2><pre>{esc(json.dumps(events, ensure_ascii=False, indent=2))}</pre>
 <h2>응답 확인</h2>{details}<h2>평가 방법</h2>
-<p>review.csv에서 tag_precision = 근거 있는 태그 수 / 출력 태그 수, core_recall = 포착한 핵심 개념 수 / 정답 핵심 개념 수를 기록합니다.
-출력 태그가 없으면 precision은 빈칸으로 두고 core_recall로 누락을 평가합니다. 영상 변화는 0=오류·누락, 1=일부, 2=핵심 변화 반영입니다.
+<p>review.csv에서 tag_accuracy_0to2는 0=장면과 맞지 않음, 1=일부 오류·모호함, 2=관찰과 일치로 평가합니다.
+filename_usefulness_0to2는 0=찾는 데 도움 없음, 1=일부 수정 필요, 2=그대로 활용 가능입니다.
+빈 태그 응답의 정확성은 빈칸, 활용도는 0으로 기록합니다. unsupported_claim_0or1은 근거 없는 주장이 있으면 1입니다.
+영상 변화는 0=오류·누락, 1=일부, 2=충분히 반영입니다. 사진이나 변화가 없는 영상은 해당 칸을 비웁니다.
 사람 평가 입력은 리포트 재생성 시 보존되며, 이 예제는 사람 점수를 자동 합산하지 않습니다.</p>
 <p>Based-On: none · project_extension · 실제 결과는 실행 환경과 참조 답안 검수 범위 내에서만 해석하세요.</p></html>"""
     (root / "report.html").write_text(content, encoding="utf-8")
