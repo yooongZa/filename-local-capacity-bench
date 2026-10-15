@@ -9,12 +9,28 @@ import tempfile
 import time
 import urllib.request
 from PIL import Image
+import imageio_ffmpeg
 
 with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
     photo = root / "photos"
     photo.mkdir()
     Image.new("RGB", (64, 48), "green").save(photo / "test.png")
+    subprocess.run(
+        [
+            imageio_ffmpeg.get_ffmpeg_exe(),
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=green:s=64x48:r=5",
+            "-t",
+            "2",
+            str(photo / "test.mp4"),
+        ],
+        check=True,
+    )
     environment = dict(os.environ, FILENAME_HOME=str(root / "app-home"))
     process = subprocess.Popen(
         [sys.argv[1], "--mock", "--no-browser", "--port", "0"], env=environment
@@ -47,6 +63,10 @@ with tempfile.TemporaryDirectory() as temporary:
                 time.sleep(1)
         else:
             raise RuntimeError("앱 API가 시작되지 않았습니다.")
+        profile_path = root / "app-home/configs/profiles/gemma4_12b.json"
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        profile["video_extraction"]["ffmpeg_path"] = "auto"
+        profile_path.write_text(json.dumps(profile), encoding="utf-8")
         call("/api/analyze", {"folder": str(photo)})
         for _ in range(30):
             state = call("/api/state")
@@ -54,10 +74,13 @@ with tempfile.TemporaryDirectory() as temporary:
                 break
             time.sleep(0.3)
         assert not state["error"], state
-        assert state["items"][0]["status"] == "ready", state
+        assert len(state["items"]) == 2, state
+        assert all(row["status"] == "ready" for row in state["items"]), state
         assert len(state["items"][0]["tags"]) == 5
         assert (photo / "test.png").exists()
-        print("PASS: packaged API, 5-tag mock analysis, original untouched")
+        print(
+            "PASS: packaged API, bundled FFmpeg, photo/video 5-tag mock analysis, originals untouched"
+        )
     finally:
         try:
             call("/api/quit", {})
