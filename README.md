@@ -4,6 +4,44 @@
 
 평가 데이터는 팀이 ZIP으로 업로드합니다. 사진·프레임·정답을 생성하는 기능은 없습니다.
 
+## 동작 구조
+
+**실제 로컬 장비에서 입력량과 동시 요청 수를 바꾸며 실행 가능한 범위를 측정합니다.** 아래는 실제 모델을 사용하는 실행 흐름입니다.
+
+```mermaid
+flowchart TD
+    DATA["팀이 준비한 사진 · 영상 프레임<br/>ZIP 가져오기 또는 기존 폴더"] --> READ["입력 검사 · EDA"]
+    READ --> PLAN["실험 조건 만들기<br/>이미지 수 · 컨텍스트 · 동시 요청 · 반복 횟수"]
+    CONFIG["수정할 곳 · b_local.json<br/>실험값 · 서버와 모델 파일 경로"] --> PLAN
+    PLAN --> START["현재 조건으로 llama-server 시작<br/>Q4 GGUF + mmproj 로드<br/>실제 컨텍스트와 슬롯 수 확인"]
+    START --> PREP["프레임 선택 · 크기 조절<br/>컨텍스트 실험은 입력 토큰 보정 추가"]
+    PREP --> REQUEST["같은 서버에서 조건별 요청 실행<br/>이미지와 프롬프트를 로컬 HTTP로 전달"]
+    REQUEST --> MODEL["Mac Metal / Windows CUDA<br/>Gemma 4 12B QAT · Q4 GGUF"]
+    MODEL --> SAVE["응답 · JSON 검사 · 오류 기록<br/>시간 · 메모리 · 실제 토큰 · 활성 슬롯 측정"]
+    SAVE --> CLOSE["현재 조건의 요청 완료 후<br/>직접 시작한 서버 종료"]
+    CLOSE --> NEXT{"다음 실험 조건이 있나?"}
+    NEXT -->|예| START
+    NEXT -->|아니요| REPORT["HTML 리포트 · CSV · 사람 평가표<br/>성공한 범위 · 실패 조건 비교"]
+    REPORT --> DECIDE["실제 응답 품질 재확인<br/>장비에 맞는 운영 설정 선택"]
+
+    classDef editable fill:#fff3cd,stroke:#9a6700,color:#24292f;
+    classDef inference fill:#ddf4ff,stroke:#0969da,color:#24292f;
+    classDef result fill:#dafbe1,stroke:#1a7f37,color:#24292f;
+    class CONFIG editable;
+    class START,MODEL inference;
+    class REPORT,DECIDE result;
+```
+
+- **조건마다 서버를 새로 시작합니다.** 같은 조건 안에서는 서버를 유지합니다. `soak` 실험은 한 프로세스에서 기본 100회 요청해 모델 재사용을 확인합니다.
+- **이미지 수와 동시 요청 수를 구분합니다.** 영상 3프레임을 한 요청에 넣는 것과, 독립 요청 3건을 동시에 보내는 것은 다른 실험입니다.
+- **컨텍스트는 실제 사용량도 확인합니다.** `context` 실험은 먼저 입력 토큰을 측정하고 중립 텍스트로 기본 약 75% 점유를 목표로 보정합니다. 이 입력은 용량 측정용입니다.
+
+메모리 부족·시간 초과·서버 오류가 발생하면 직접 시작한 서버를 종료하고 실행을 멈춘 뒤, 확보한 기록으로 리포트를 만듭니다. NVIDIA VRAM은 `nvidia-smi`, 프로세스 RAM은 `psutil`로 측정합니다. Mac의 NVIDIA VRAM 항목은 빈값이며 통합 메모리 전체 사용량을 뜻하지 않습니다.
+
+`--dry-run`은 입력·계획만 확인하고, `--mock`은 실제 서버 대신 고정 응답을 사용합니다. 선택적으로 제공한 정답은 평가에만 사용합니다. 서버는 로컬 주소 `127.0.0.1`로 통신합니다.
+
+코드에서 따라갈 순서: [입력·프레임 처리](filename_bench/data.py) → [실험 반복](filename_bench/runner.py) → [서버 시작·요청·종료](filename_bench/backends.py) → [메모리·슬롯 측정](filename_bench/telemetry.py) → [리포트](filename_bench/report.py).
+
 ## 먼저 바꿀 설정
 
 `configs/b_local.json`에서 `server_path`, `model_path`, `mmproj_path`를 실제 파일 위치로 바꾸세요. 기본 파일명은 LM Studio의 Gemma 4 12B QAT Q4_0에 맞췄습니다. Mac에서도 경로를 실제 위치로 바꿉니다. [모델 구분](docs/MODEL.md)
