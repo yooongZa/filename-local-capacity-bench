@@ -1,0 +1,21 @@
+flowchart TD
+    DATA["팀이 준비한 사진 · 영상 프레임<br/>ZIP 가져오기 또는 기존 폴더"] --> READ["입력 검사 · EDA"]
+    READ --> PLAN["실험 조건 만들기<br/>이미지 수 · 컨텍스트<br/>동시 요청 · 반복 횟수"]
+    CONFIG["수정할 곳 · b_local.json<br/>실험값 · 서버와 모델 파일 경로"] --> PLAN
+    PLAN --> START["조건별 llama-server 시작<br/>Q4 GGUF + mmproj 로드<br/>실제 컨텍스트와 슬롯 수 확인"]
+    START --> PREP["프레임 선택 · 크기 조절<br/>컨텍스트 실험은 입력 토큰 보정 추가"]
+    PREP --> REQUEST["같은 서버에서 조건별 요청 실행<br/>이미지와 프롬프트를 로컬 HTTP로 전달"]
+    REQUEST --> MODEL["Mac Metal / Windows CUDA<br/>Gemma 4 12B QAT · Q4 GGUF"]
+    MODEL --> SAVE["응답 · JSON 검사 · 오류 기록<br/>시간 · 메모리 · 실제 토큰 · 활성 슬롯 측정"]
+    SAVE --> CLOSE["현재 조건의 요청 완료 후<br/>직접 시작한 서버 종료"]
+    CLOSE --> NEXT{"다음 실험 조건이 있나?"}
+    NEXT -->|예| START
+    NEXT -->|아니요| REPORT["HTML 리포트 · CSV · 사람 평가표<br/>성공한 범위 · 실패 조건 비교"]
+    REPORT --> DECIDE["실제 응답 품질 재확인<br/>장비에 맞는 운영 설정 선택"]
+
+    classDef editable fill:#fff3cd,stroke:#9a6700,color:#24292f;
+    classDef inference fill:#ddf4ff,stroke:#0969da,color:#24292f;
+    classDef result fill:#dafbe1,stroke:#1a7f37,color:#24292f;
+    class CONFIG editable;
+    class START,MODEL inference;
+    class REPORT,DECIDE result;
