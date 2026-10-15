@@ -120,6 +120,7 @@ class AppService:
             "config_path": str(self.config_path),
             "model": "Gemma 4 12B QAT",
             "operation": "idle",
+            "analysis_id": "",
             "review_before_rename": read_json(self.config_path).get(
                 "review_before_rename", True
             ),
@@ -184,6 +185,7 @@ class AppService:
         write_json(self.config_path, saved)
         with self.lock:
             self.folder = root
+            self.state["analysis_id"] = uuid.uuid4().hex
             self.items = []
             self.previews = {}
         with FolderLock(root):

@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id);
 const token=new URLSearchParams(location.hash.slice(1)).get('token')||sessionStorage.getItem('filename-token');
 if(token)sessionStorage.setItem('filename-token',token);
 history.replaceState(null,'',location.pathname);
-let lastRows='',state={},folderLocation='',initialized=false,quitting=false;
+let lastRows='',state={},folderLocation='',initialized=false,quitting=false,analysisId='';
 const edits=new Map(), selected=new Set(), previews=new Map();
 async function api(path,body){
  const response=await fetch(path,{method:body?'POST':'GET',headers:{'X-Filename-Token':token||'','Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
@@ -18,6 +18,9 @@ function newName(row,tags){
  return stem+'__'+tags.map(t=>t.trim()).join('_')+extension;
 }
 function refreshButton(){
+ const eligible=(state.items||[]).filter(r=>['ready','review'].includes(r.status));
+ $('selectAll').checked=eligible.length>0&&eligible.every(r=>selected.has(r.id));
+ $('selectAll').indeterminate=selected.size>0&&!$('selectAll').checked;
  $('rename').disabled=state.busy||state.mock||selected.size===0;
  $('rename').firstChild.textContent=$('review').checked?'검토 완료 · '+selected.size+'개 변경 ':'선택한 '+selected.size+'개 변경 ';
 }
@@ -52,6 +55,10 @@ function renderRows(rows){
 async function poll(){
  try{
   state=await api('/api/state');
+  if(state.analysis_id&&state.analysis_id!==analysisId){
+   analysisId=state.analysis_id;edits.clear();selected.clear();previews.forEach(URL.revokeObjectURL);previews.clear();lastRows='';
+   $('folder').value=state.folder;showError('');
+  }
   if(!initialized){$('review').checked=state.review_before_rename;$('automatic').checked=state.auto_rename;initialized=true;modeHint();}$('message').textContent=state.message;$('mock').hidden=!state.mock;
   $('counts').textContent=state.total?`${state.processed} / ${state.total}개 · 완료 파일 건너뜀 ${state.skipped}개`:'Gemma 4 12B QAT · 태그 5개';
   $('configPath').textContent='설정 · '+state.config_path;

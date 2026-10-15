@@ -1,6 +1,7 @@
 """패키징된 실행 파일의 모의 화면·분석 API를 확인합니다. 실사용 모델 검증과 구분합니다."""
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,15 +15,16 @@ with tempfile.TemporaryDirectory() as temporary:
     photo = root / "photos"
     photo.mkdir()
     Image.new("RGB", (64, 48), "green").save(photo / "test.png")
+    environment = dict(os.environ, FILENAME_HOME=str(root / "app-home"))
     process = subprocess.Popen(
-        [sys.argv[1], "--mock", "--no-browser", "--port", "18764"]
+        [sys.argv[1], "--mock", "--no-browser", "--port", "0"], env=environment
     )
     # 사용자 설정 디렉터리는 패키지와 소스에서 같은 규칙입니다.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from filename_app.runtime import app_home
 
     def call(route, body=None):
-        url = (app_home() / "last-url.txt").read_text()
+        url = (root / "app-home" / "last-url.txt").read_text()
         base = url.split("/#")[0]
         token = url.split("token=")[1]
         request = urllib.request.Request(

@@ -50,6 +50,8 @@ MODEL_FILES = {
 
 
 def app_home():
+    if os.environ.get("FILENAME_HOME"):
+        return Path(os.environ["FILENAME_HOME"]).expanduser().resolve()
     if sys.platform == "win32":
         return (
             Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))

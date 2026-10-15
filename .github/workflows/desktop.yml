@@ -19,6 +19,8 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

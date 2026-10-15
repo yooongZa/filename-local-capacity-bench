@@ -32,6 +32,8 @@ def media_input(path, sha, cfg, cache, event):
             [ffmpeg, "-hide_banner", "-i", str(path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
@@ -76,6 +78,8 @@ def media_input(path, sha, cfg, cache, event):
                     ],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=timeout,
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                 )

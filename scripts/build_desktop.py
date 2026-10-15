@@ -47,4 +47,4 @@ for module in [
     command += ["--exclude-module", module]
 command += [str(ROOT / "app.py")]
 subprocess.run(command, cwd=ROOT, check=True)
-print("빌드 완료:", ROOT / "dist")
+print("Build complete:", ROOT / "dist")
